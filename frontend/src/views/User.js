@@ -24,6 +24,10 @@ import {
   Marker,
 } from "react-google-maps";
 
+// import FormGroup from '@material-ui/core/FormGroup';
+import FormControlLabel from '@material-ui/core/FormControlLabel';
+import Checkbox from '@material-ui/core/Checkbox';
+
 // reactstrap components
 import {
   Button,
@@ -38,10 +42,12 @@ import {
   Col,
 } from "reactstrap";
 
+// import CheckboxLabels from "./Checkboxes.js";
+
 const MapWrapper = withScriptjs(
   withGoogleMap((props) => (
     <GoogleMap
-      defaultZoom={13}
+      defaultZoom={3}
       defaultCenter={{ lat: 0.0, lng: 0.0 }}
       defaultOptions={{
         scrollwheel: false, //we disable de scroll over the map, it is a really annoing when you scroll through page
@@ -188,7 +194,7 @@ const MapWrapper = withScriptjs(
         ],
       }}
     >
-      {props.locations.map(loc => <Marker position={{ lat: parseFloat(loc.lat), lng: parseFloat(loc.long) }} key={loc.updated} />)}
+      {props.locations.map(loc => <Marker position={{ lat: parseFloat(loc.lat), lng: parseFloat(loc.long) }} key={loc.updated} color="blue"/>)}
     </GoogleMap>
   ))
 );
@@ -198,7 +204,10 @@ class User extends React.Component {
   constructor(props) {
     super(props)
     this.state = {
-      locations: []
+      locations: [],
+      checkedMasks: false,
+      checkedVaccines: false,
+      checkedOxygen: false,
     }
   }
 
@@ -226,6 +235,27 @@ class User extends React.Component {
         .catch(error => console.log(error))
   }
 
+  fetchDataFiltered(field) {
+    const url = "http://localhost:5000/get"
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        lat: 0.1,
+        long: 0.1,
+        radius: 10000000,
+        numeric: field
+      })
+    })
+        .then(response => response.json())
+        .then(data => { this.setState({locations: data.results}); console.log(data)} )
+        .catch(error => console.log(error))
+  }
+
   addRandomLocation() {
     const url = "http://localhost:5000/insert"
     fetch(url, {
@@ -238,7 +268,7 @@ class User extends React.Component {
       body: JSON.stringify({
         lat: Math.random() * 3,
         long: Math.random() * 3,
-        masks: 1,
+        masks: 0,
         vaccines: 2,
         oxygen: 3
       })
@@ -248,8 +278,21 @@ class User extends React.Component {
         .catch(error => console.log(error))
   }
 
-
   render() {
+    const handleChange = (event) => {
+      // For some reason the setState function isn't working, but this does
+      this.state[[event.target.name]] = event.target.checked;
+
+      if (this.state.checkedMasks) {
+        this.fetchDataFiltered('masks');
+      } else if (this.state.checkedVaccines) {
+        this.fetchDataFiltered('vaccines');
+      } else if (this.state.checkedOxygen) {
+        this.fetchDataFiltered('oxygen');
+      } else {
+        this.fetchData();
+      }
+    };
     return (
       <>
         <div className="content">
@@ -272,6 +315,23 @@ class User extends React.Component {
                   </div>
                 </CardBody>
               </Card>
+              <FormGroup>
+                <FormControlLabel
+                    control={<Checkbox checked={this.state.checkedMasks} onChange={handleChange} name="checkedMasks" />}
+                    label="Masks"
+                    color="red"
+                />
+                <FormControlLabel
+                    control={<Checkbox checked={this.state.checkedVaccines} onChange={handleChange} name="checkedVaccines" />}
+                    label="Vaccines"
+                    color="blue"
+                />
+                <FormControlLabel
+                    control={<Checkbox checked={this.state.checkedOxygen} onChange={handleChange} name="checkedOxygen" />}
+                    label="Oxygen"
+                    color="green"
+                />
+              </FormGroup>
             </Col>
             <Col sm="12" lg="4">
               <Card className="card-user">
@@ -377,10 +437,10 @@ class User extends React.Component {
                     <Row>
                       <Col md="12">
                         <FormGroup>
-                          <label>About Me</label>
+                          <label>More information</label>
                           <Input
                             type="textarea"
-                            defaultValue="Oh so, your weak rhyme You doubt I'll bother, reading into it"
+                            defaultValue=""
                           />
                         </FormGroup>
                       </Col>
@@ -401,9 +461,6 @@ class User extends React.Component {
                 </CardBody>
               </Card>
             </Col>
-          </Row>
-          <Row>
-            
           </Row>
         </div>
       </>

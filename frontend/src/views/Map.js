@@ -30,8 +30,8 @@ import { Card, CardHeader, CardBody, Row, Col } from "reactstrap";
 const MapWrapper = withScriptjs(
   withGoogleMap((props) => (
     <GoogleMap
-      defaultZoom={13}
-      defaultCenter={{ lat: 40.748817, lng: -73.985428 }}
+      defaultZoom={3}
+      defaultCenter={{ lat: 4.748817, lng: -73.985428 }}
       defaultOptions={{
         scrollwheel: false, //we disable de scroll over the map, it is a really annoing when you scroll through page
         styles: [

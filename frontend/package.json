@@ -4,6 +4,8 @@
   "private": true,
   "homepage": "https://demos.creative-tim.com/paper-dashboard-react/#/dashboard",
   "dependencies": {
+    "@material-ui/core": "^4.11.4",
+    "@material-ui/icons": "^4.11.2",
     "bootstrap": "4.5.0",
     "browserslist": "^4.16.6",
     "chart.js": "2.9.3",
