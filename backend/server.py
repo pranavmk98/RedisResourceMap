@@ -43,6 +43,15 @@ def construct_key(lat, long):
 Endpoint to insert JSON data
 
 @requires 'lat' and 'long' keys to exist in the data
+
+Example of expected POST data:
+{
+    'lat': 10.573,
+    'long': -48.62,
+    'masks': 500,
+    'vaccines': 345,
+    'oxygen': 23
+}
 '''
 @app.route('/insert', methods=['POST'])
 def insert_data():
@@ -71,6 +80,29 @@ Endpoint to retrieve existing data by filter
 @requires 'lat' and 'long' and 'radius' keys to exist in the data
 
 Note: Can only filter by 1 numeric quantity (RediSearch restriction)
+
+Example of expected POST data:
+{
+    'lat': 10.573,
+    'long': -48.62,
+    'radius': 25, (in kilometers)
+    'numeric': 'masks' [optional arg]
+}
+
+Return JSON data format:
+{
+    'results' : [
+        {
+            'lat': 10.573,
+            'long': -48.62,
+            'masks': 500,
+            'vaccines': 345,
+            'oxygen': 23,
+            'updated': 18727939423
+        },
+        ...
+    ]
+}
 '''
 @app.route('/get', methods=['POST'])
 def get_data():
