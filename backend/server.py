@@ -2,6 +2,7 @@ import time
 from redis_json import RedisJson
 from redis_search import RediSearch, NumericFilter, GeoFilter
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 '''
     Flask server to interface with Redis APIs
@@ -26,6 +27,7 @@ geo_fields = [
 INT_MAX = 10000000000
 
 app = Flask(__name__)
+CORS(app)
 redisJson = RedisJson()
 rediSearch = RediSearch(index, numeric_fields, geo_fields)
 
@@ -66,7 +68,7 @@ def insert_data():
 '''
 Endpoint to retrieve existing data by filter
 
-@requires 'lat' and 'long' keys to exist in the data
+@requires 'lat' and 'long' and 'radius' keys to exist in the data
 
 Note: Can only filter by 1 numeric quantity (RediSearch restriction)
 '''
