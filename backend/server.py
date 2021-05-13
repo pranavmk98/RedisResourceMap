@@ -5,7 +5,7 @@ from redis_json import RedisJson
 from redis_search import RediSearch, NumericFilter, GeoFilter
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_socketio import SocketIO, send
+from flask_socketio import SocketIO, emit
 
 from gearsclient import GearsRemoteBuilder as GB
 from gearsclient import execute
@@ -67,13 +67,13 @@ def get_socket_namespace(lat, long, radius):
 
 
 '''
-Register RedisGears job to update on new data
+Register RedisGears jobs
 '''
-def create_gears_job(lat, long, radius):
+def create_gears_jobs(lat, long, radius):
     # Function to execute on each added key
-    def exec_fn(x):
+    def publish_new_data(x):
         # Use geospatial querying from RediSearch
-        args = [INDEX, f'@coords:[{long} {lat} {radius} km]']
+        args = [INDEX, f'@coords:[{long} {lat} {radius} km]', 'INKEYS', 1, x['key']]
         results = execute('FT.SEARCH', *args)
 
         # Nasty, lots of hardcoding, assumes result format:
@@ -83,9 +83,25 @@ def create_gears_job(lat, long, radius):
 
         # Publish update on pubsub channel
         output_dict = {result[i] : result[i + 1] for i in range(0, len(result), 2)}
-        execute('PUBLISH', 'chan', str(output_dict))
+        execute('PUBLISH', 'new_data', str(output_dict))
+        execute('PUBLISH', 'new_data', str(x['value']))
 
-    redisGears = GB('KeysReader').foreach(exec_fn).register(prefix='*', eventTypes=['hset', 'hmset'])
+    def match_resources(x):
+
+        # Use geospatial querying from RediSearch
+        args = [INDEX, f'@coords:[{long} {lat} {radius} km]', 'INKEYS', 1, x['key']]
+        results = execute('FT.SEARCH', *args)
+
+        # Nasty, lots of hardcoding, assumes result format:
+        result = results[2]
+        if len(result) % 2 != 0:
+            return
+
+        # Publish update on pubsub channel
+        output_dict = {result[i] : result[i + 1] for i in range(0, len(result), 2)}
+        execute('PUBLISH', 'match_data', str(output_dict))
+
+    redisGears = GB('KeysReader').foreach(publish_new_data).register(prefix='*', eventTypes=['hset', 'hmset'])
 
 ######################
 ## Server endpoints ##
@@ -188,7 +204,7 @@ def get_data():
 
         SOCKET_NAMESPACE = get_socket_namespace(lat, long, radius)
 
-        create_gears_job(lat, long, radius)
+        create_gears_jobs(lat, long, radius)
         return {'results' : response, 'namespace' : SOCKET_NAMESPACE}, 200
 
     return "Bad request", 400
@@ -198,11 +214,12 @@ Process message received from Redis PubSub channel
 '''
 def process_channel_msg(msg):
     if msg['type'] == 'message':
-        data = msg['data'].decode('utf-8')
-        emit(data, namespace=SOCKET_NAMESPACE)
+        with app.test_request_context():
+            data = msg['data'].decode('utf-8')
+            socket_app.emit(data, namespace=SOCKET_NAMESPACE)
 
 if __name__ == "__main__":
     pubsub = redisClient.pubsub()
-    pubsub.subscribe(**{'chan': process_channel_msg})
+    pubsub.subscribe(**{'new_data': process_channel_msg})
     pubsub.run_in_thread(sleep_time=0.1)
     socket_app.run(app)
