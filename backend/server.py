@@ -42,7 +42,7 @@ INT_MAX = 10000000000
 app = Flask(__name__)
 CORS(app)
 # TODO: install eventlet if this is too slow
-socket_app = SocketIO(app)
+socket_app = SocketIO(app, cors_allowed_origins="*")
 redisJson = RedisJson()
 rediSearch = RediSearch(INDEX, NUMERIC_FIELDS, GEO_FIELDS)
 redisClient = redis.Redis(host='localhost', port=6379)

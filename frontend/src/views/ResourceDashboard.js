@@ -24,7 +24,6 @@ import {
   Marker,
 } from "react-google-maps";
 
-// import FormGroup from '@material-ui/core/FormGroup';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import Checkbox from '@material-ui/core/Checkbox';
 
@@ -35,20 +34,22 @@ import {
   CardHeader,
   CardBody,
   CardTitle,
+  CardFooter,
   FormGroup,
   Form,
   Input,
   Row,
   Col,
+  Label,
 } from "reactstrap";
 
-// import CheckboxLabels from "./Checkboxes.js";
+import io from 'socket.io-client'
 
 const MapWrapper = withScriptjs(
   withGoogleMap((props) => (
     <GoogleMap
-      defaultZoom={3}
-      defaultCenter={{ lat: 0.0, lng: 0.0 }}
+      defaultZoom={10}
+      center={{ lat: props.centerLat, lng: props.centerLong }}
       defaultOptions={{
         scrollwheel: false, //we disable de scroll over the map, it is a really annoing when you scroll through page
         disableDefaultUI: true,
@@ -199,11 +200,15 @@ const MapWrapper = withScriptjs(
   ))
 );
 
-class User extends React.Component {
+class ResourceDashboard extends React.Component {
 
   constructor(props) {
     super(props)
     this.state = {
+      gettingInitialLocation: true,
+      centerLat: 0,
+      centerLong: 0,
+      radius: 0,
       locations: [],
       checkedMasks: false,
       checkedVaccines: false,
@@ -212,7 +217,19 @@ class User extends React.Component {
   }
 
   componentDidMount() {
-    this.fetchData();
+    this.getCenterLatLong();
+    let socketEndpoint = "http://localhost:5000";
+    this.socket = io.connect(socketEndpoint, {
+      reconnection: true,
+    });
+  }
+
+  getCenterLatLong() {
+    navigator.geolocation.getCurrentPosition((position) => {
+      this.setState({ centerLat: position.coords.latitude, 
+                      centerLong: position.coords.longitude });
+      this.fetchData();
+    });
   }
 
   fetchData() {
@@ -225,39 +242,34 @@ class User extends React.Component {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        lat: 0.1,
-        long: 0.1,
-        radius: 10000000
+        lat: this.state.centerLat,
+        long: this.state.centerLong,
+        radius: this.state.radius,
       })
     })
         .then(response => response.json())
-        .then(data => { this.setState({locations: data.results}); console.log(data)} )
+        .then(data => this.setState({locations: data.results, socketNamespace: data.namespace}))
+        .then(this.connectWebsocket())
         .catch(error => console.log(error))
   }
 
-  fetchDataFiltered(field) {
-    const url = "http://localhost:5000/get"
-    return fetch(url, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        lat: 0.1,
-        long: 0.1,
-        radius: 10000000,
-        numeric: field
-      })
-    })
-        .then(response => response.json())
-        .then(data => { this.setState({locations: data.results}); console.log(data)} )
-        .catch(error => console.log(error))
+  connectWebsocket() {
+    let socketUrl = "http://localhost:5000";
+    this.socket = io.connect(socketUrl, {
+      reconnection: true,
+    });
+    this.socket.on("message", message => {
+      console.log(message);
+      this.setState({locations: [...this.state.locations, message]});
+    });
   }
 
-  addRandomLocation() {
+  addLocation() {
     const url = "http://localhost:5000/insert"
+    let body = {
+      lat: this.state.inputLat,
+      long: this.state.inputLong,
+    }
     fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
@@ -265,13 +277,8 @@ class User extends React.Component {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        lat: Math.random() * 3,
-        long: Math.random() * 3,
-        masks: 0,
-        vaccines: 2,
-        oxygen: 3
-      })
+      
+      body: JSON.stringify(body)
     })
         .then(response => console.log('added data location'))
         .then(this.fetchData())
@@ -279,26 +286,30 @@ class User extends React.Component {
   }
 
   render() {
-    const handleChange = (event) => {
+    const handleFilterChange = (event) => {
       // For some reason the setState function isn't working, but this does
       this.state[[event.target.name]] = event.target.checked;
 
       if (this.state.checkedMasks) {
-        this.fetchDataFiltered('masks');
+        this.filterMarkers('masks');
       } else if (this.state.checkedVaccines) {
-        this.fetchDataFiltered('vaccines');
+        this.filterMarkers('vaccines');
       } else if (this.state.checkedOxygen) {
-        this.fetchDataFiltered('oxygen');
+        this.filterMarkers('oxygen');
       } else {
         this.fetchData();
       }
     };
+
     return (
       <>
         <div className="content">
         <Row>
             <Col sm="12" lg="8">
               <Card>
+                <CardHeader>
+                  <CardTitle tag="h5">View Existing Resource Requests</CardTitle>
+                </CardHeader>
                 <CardBody>
                   <div
                     id="map"
@@ -310,137 +321,114 @@ class User extends React.Component {
                       loadingElement={<div style={{ height: `100%` }} />}
                       containerElement={<div style={{ height: `100%` }} />}
                       mapElement={<div style={{ height: `100%` }} />}
+                      centerLat={this.state.centerLat}
+                      centerLong={this.state.centerLong}
                       locations={this.state.locations}
                     />
                   </div>
+                  <CardFooter>
+                  <div className="card-stats">
+                    <i className="nc-icon nc-compass-05" /> Filter resources on Map
+                  </div>
+                  <FormGroup>
+                    <FormControlLabel
+                        control={<Checkbox checked={this.state.checkedMasks} onChange={handleFilterChange} name="checkedMasks" />}
+                        label="Masks"
+                        color="red"
+                    />
+                    <FormControlLabel
+                        control={<Checkbox checked={this.state.checkedVaccines} onChange={handleFilterChange} name="checkedVaccines" />}
+                        label="Vaccines"
+                        color="blue"
+                    />
+                    <FormControlLabel
+                        control={<Checkbox checked={this.state.checkedOxygen} onChange={handleFilterChange} name="checkedOxygen" />}
+                        label="Oxygen"
+                        color="green"
+                    />
+                  </FormGroup>
+                  </CardFooter>
                 </CardBody>
               </Card>
-              <FormGroup>
-                <FormControlLabel
-                    control={<Checkbox checked={this.state.checkedMasks} onChange={handleChange} name="checkedMasks" />}
-                    label="Masks"
-                    color="red"
-                />
-                <FormControlLabel
-                    control={<Checkbox checked={this.state.checkedVaccines} onChange={handleChange} name="checkedVaccines" />}
-                    label="Vaccines"
-                    color="blue"
-                />
-                <FormControlLabel
-                    control={<Checkbox checked={this.state.checkedOxygen} onChange={handleChange} name="checkedOxygen" />}
-                    label="Oxygen"
-                    color="green"
-                />
-              </FormGroup>
+
             </Col>
             <Col sm="12" lg="4">
               <Card className="card-user">
                 <CardHeader>
-                  <CardTitle tag="h5">Update Resource Requests</CardTitle>
+                  <CardTitle tag="h5">Create Resource Request</CardTitle>
                 </CardHeader>
                 <CardBody>
                   <Form>
                     <Row>
                       <Col>
                         <FormGroup>
-                          <label></label>
+                          <label>Do you have a surplus or deficit of resources?</label>
                           <Input type="select">
-                            <option>Test1</option>
-                            <option>Test2</option>
+                            <option>I Have Resources to Give</option>
+                            <option>I Need Resources</option>
                           </Input>
                         </FormGroup>
                       </Col>
                     </Row>
 
                     <Row>
-                      <Col className="px-1" md="3">
+                      <Col className="pc-1" md="12">
+                      <FormGroup tag="fieldset">
+                      <label>What type of resources are you interested in? </label>
+                        <FormGroup check>
+                          <Label check>
+                            <Input type="radio" name="radio1" />{' '}
+                            Masks
+                          </Label>
+                        </FormGroup>
+                        <FormGroup check>
+                          <Label check>
+                            <Input type="radio" name="radio1" />{' '}
+                            Vaccines
+                          </Label>
+                        </FormGroup>
+                        <FormGroup check>
+                          <Label check>
+                            <Input type="radio" name="radio1" />{' '}
+                            Oxygen
+                          </Label>
+                        </FormGroup>
+                      </FormGroup>
+                      </Col>
+                      <Col className="pc-1" md="12">
                         <FormGroup>
-                          <label>Username</label>
+                          <label>Quantity of Resources</label>
                           <Input
-                            defaultValue="michael23"
-                            placeholder="Username"
-                            type="text"
+                            defaultValue="0"
+                            placeholder="0"
+                            type="number"
                           />
                         </FormGroup>
                       </Col>
-                      <Col className="pl-1" md="4">
-                        <FormGroup>
-                          <label htmlFor="exampleInputEmail1">
-                            Email address
-                          </label>
-                          <Input placeholder="Email" type="email" />
-                        </FormGroup>
-                      </Col>
                     </Row>
+
                     <Row>
                       <Col className="pr-1" md="6">
-                        <FormGroup>
-                          <label>First Name</label>
+                        <FormGroup
+                          disabled
+                        >
+                          <label>Latitude</label>
                           <Input
-                            defaultValue="Chet"
-                            placeholder="Company"
+                            defaultValue="0"
+                            placeholder="0"
                             type="text"
                           />
                         </FormGroup>
                       </Col>
                       <Col className="pl-1" md="6">
-                        <FormGroup>
-                          <label>Last Name</label>
+                        <FormGroup
+                          disabled
+                        >
+                          <label>Longitude</label>
                           <Input
-                            defaultValue="Faker"
-                            placeholder="Last Name"
+                            defaultValue="0"
+                            placeholder="0"
                             type="text"
-                          />
-                        </FormGroup>
-                      </Col>
-                    </Row>
-                    <Row>
-                      <Col md="12">
-                        <FormGroup>
-                          <label>Address</label>
-                          <Input
-                            defaultValue="Melbourne, Australia"
-                            placeholder="Home Address"
-                            type="text"
-                          />
-                        </FormGroup>
-                      </Col>
-                    </Row>
-                    <Row>
-                      <Col className="pr-1" md="4">
-                        <FormGroup>
-                          <label>City</label>
-                          <Input
-                            defaultValue="Melbourne"
-                            placeholder="City"
-                            type="text"
-                          />
-                        </FormGroup>
-                      </Col>
-                      <Col className="px-1" md="4">
-                        <FormGroup>
-                          <label>Country</label>
-                          <Input
-                            defaultValue="Australia"
-                            placeholder="Country"
-                            type="text"
-                          />
-                        </FormGroup>
-                      </Col>
-                      <Col className="pl-1" md="4">
-                        <FormGroup>
-                          <label>Postal Code</label>
-                          <Input placeholder="ZIP Code" type="number" />
-                        </FormGroup>
-                      </Col>
-                    </Row>
-                    <Row>
-                      <Col md="12">
-                        <FormGroup>
-                          <label>More information</label>
-                          <Input
-                            type="textarea"
-                            defaultValue=""
                           />
                         </FormGroup>
                       </Col>
@@ -451,9 +439,9 @@ class User extends React.Component {
                           className="btn-round"
                           color="primary"
                           type="submit"
-                          onClick={() => this.addRandomLocation()}
+                          onClick={() => this.addLocation()}
                         >
-                          Update Profile
+                          Add Resource Request to Map
                         </Button>
                       </div>
                     </Row>
@@ -468,4 +456,4 @@ class User extends React.Component {
   }
 }
 
-export default User;
+export default ResourceDashboard;
