@@ -3,15 +3,13 @@ import redis
 
 from redis_json import RedisJson
 from redis_search import RediSearch, NumericFilter, GeoFilter
+from redis_gears import create_gears_jobs
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 
-from gearsclient import GearsRemoteBuilder as GB
-from gearsclient import execute
-
 '''
-    Flask server to interface with Redis APIs
+Flask server to interface with Redis APIs
 '''
 
 #############
@@ -66,42 +64,6 @@ def get_socket_namespace(lat, long, radius):
     return f'{long},{lat},{radius}'
 
 
-'''
-Register RedisGears jobs
-'''
-def create_gears_jobs(lat, long, radius):
-    # Function to execute on each added key
-    def publish_new_data(x):
-        # Use geospatial querying from RediSearch
-        args = [INDEX, f'@coords:[{long} {lat} {radius} km]', 'INKEYS', 1, x['key']]
-        results = execute('FT.SEARCH', *args)
-
-        # Nasty, lots of hardcoding, assumes result format:
-        result = results[2]
-        if len(result) % 2 != 0:
-            return
-
-        # Publish update on pubsub channel
-        output_dict = {result[i] : result[i + 1] for i in range(0, len(result), 2)}
-        execute('PUBLISH', 'new_data', str(output_dict))
-        execute('PUBLISH', 'new_data', str(x['value']))
-
-    def match_resources(x):
-
-        # Use geospatial querying from RediSearch
-        args = [INDEX, f'@coords:[{long} {lat} {radius} km]', 'INKEYS', 1, x['key']]
-        results = execute('FT.SEARCH', *args)
-
-        # Nasty, lots of hardcoding, assumes result format:
-        result = results[2]
-        if len(result) % 2 != 0:
-            return
-
-        # Publish update on pubsub channel
-        output_dict = {result[i] : result[i + 1] for i in range(0, len(result), 2)}
-        execute('PUBLISH', 'match_data', str(output_dict))
-
-    redisGears = GB('KeysReader').foreach(publish_new_data).register(prefix='*', eventTypes=['hset', 'hmset'])
 
 ######################
 ## Server endpoints ##
@@ -129,9 +91,9 @@ def insert_data():
 
         rediSearch.insert_doc(
             key,
-            masks=json['masks'],
-            vaccines=json['vaccines'],
-            oxygen=json['oxygen'],
+            masks=(0 if 'masks' not in json else json['masks']),
+            vaccines=(0 if 'vaccines' not in json else json['vaccines']),
+            oxygen=(0 if 'oxygen' not in json else json['oxygen']),
             updated=time.time(),
             coords=key
         )
@@ -210,7 +172,25 @@ def get_data():
     return "Bad request", 400
 
 '''
-Process message received from Redis PubSub channel
+Process message received from Redis PubSub channels and push it onto websocket
+
+Format of new data: {
+    'masks': 20,
+    'vaccines': 30,
+    'oxygen': 40,
+    'updated': 16979930.9901
+    'coords': '-10.0,15.0' (long,lat)
+}
+
+Format of match data (e.g. for masks): {
+    'masks_match': 1,
+    'qty': 40,
+    'need_lat': 15.0,
+    'need_long': -10.0,
+    'has_lat': 15.2,
+    'has_long': -10.1,
+    'distance': 450 (in km)
+}
 '''
 def process_channel_msg(msg):
     if msg['type'] == 'message':
@@ -220,6 +200,6 @@ def process_channel_msg(msg):
 
 if __name__ == "__main__":
     pubsub = redisClient.pubsub()
-    pubsub.subscribe(**{'new_data': process_channel_msg})
+    pubsub.subscribe(**{'new_data': process_channel_msg, 'match_data': process_channel_msg})
     pubsub.run_in_thread(sleep_time=0.1)
     socket_app.run(app)
