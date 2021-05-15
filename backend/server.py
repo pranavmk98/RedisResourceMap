@@ -1,5 +1,6 @@
 import time
 import redis
+import json
 
 from redis_json import RedisJson
 from redis_search import RediSearch, NumericFilter, GeoFilter
@@ -42,7 +43,7 @@ INT_MAX = 10000000000
 app = Flask(__name__)
 CORS(app)
 # TODO: install eventlet if this is too slow
-socket_app = SocketIO(app, cors_allowed_origins="*")
+socket_app = SocketIO(app, cors_allowed_origins='*')
 redisJson = RedisJson()
 rediSearch = RediSearch(INDEX, NUMERIC_FIELDS, GEO_FIELDS)
 redisClient = redis.Redis(host='localhost', port=6379)
@@ -61,7 +62,7 @@ def get_key(lat, long):
 Given long + lat + radius, construct name of socket namespace
 '''
 def get_socket_namespace(lat, long, radius):
-    return f'{long},{lat},{radius}'
+    return f'{abs(long)}_{abs(lat)}_{radius}'
 
 
 
@@ -164,7 +165,7 @@ def get_data():
                 'updated' : doc.updated,
             })
 
-        SOCKET_NAMESPACE = get_socket_namespace(lat, long, radius)
+        # SOCKET_NAMESPACE = get_socket_namespace(lat, long, radius)
 
         create_gears_jobs(lat, long, radius)
         return {'results' : response, 'namespace' : SOCKET_NAMESPACE}, 200
@@ -195,8 +196,11 @@ Format of match data (e.g. for masks): {
 def process_channel_msg(msg):
     if msg['type'] == 'message':
         with app.test_request_context():
+            print(msg['data'])
             data = msg['data'].decode('utf-8')
-            socket_app.emit(data, namespace=SOCKET_NAMESPACE)
+            json_data = json.dumps(data)
+            print(json_data)
+            socket_app.emit('message', data, namespace=SOCKET_NAMESPACE)
 
 if __name__ == "__main__":
     pubsub = redisClient.pubsub()

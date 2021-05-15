@@ -16,7 +16,7 @@
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 */
-import React from "react";
+import React, { useState } from "react";
 import {
   withScriptjs,
   withGoogleMap,
@@ -26,7 +26,7 @@ import {
 
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import Checkbox from '@material-ui/core/Checkbox';
-
+import { cloneDeep } from 'lodash'; 
 // reactstrap components
 import {
   Button,
@@ -43,10 +43,12 @@ import {
   Label,
 } from "reactstrap";
 
-import io from 'socket.io-client'
+import socketIOClient from 'socket.io-client';
+
 
 const MapWrapper = withScriptjs(
-  withGoogleMap((props) => (
+  withGoogleMap((props) => {
+    return (
     <GoogleMap
       defaultZoom={10}
       center={{ lat: props.centerLat, lng: props.centerLong }}
@@ -195,9 +197,10 @@ const MapWrapper = withScriptjs(
         ],
       }}
     >
-      {props.locations.map(loc => <Marker position={{ lat: parseFloat(loc.lat), lng: parseFloat(loc.long) }} key={loc.updated} color="blue"/>)}
+      {props.locations.map((loc, idx) => <Marker position={{ lat: parseFloat(loc.lat), lng: parseFloat(loc.long) }} key={idx}/>)}
     </GoogleMap>
-  ))
+    );
+  })
 );
 
 class ResourceDashboard extends React.Component {
@@ -205,29 +208,39 @@ class ResourceDashboard extends React.Component {
   constructor(props) {
     super(props)
     this.state = {
-      gettingInitialLocation: true,
       centerLat: 0,
       centerLong: 0,
-      radius: 0,
+      radius: 100000,
+      numLocations: 0,
       locations: [],
+      namespace: '',
       checkedMasks: false,
       checkedVaccines: false,
       checkedOxygen: false,
+      inputLat: 0,
+      inputLong: 0,
+      inputExcessResources: true,
+      inputResourceType: 'masks',
+      inputResourceQuantity: 0,
     }
+
+    this.handleInputResourceExcessChange = this.handleInputResourceExcessChange.bind(this);
+    this.handleInputResourceTypeChange = this.handleInputResourceTypeChange.bind(this);
+    this.handleInputResourceQuantityChange = this.handleInputResourceQuantityChange.bind(this);
   }
 
   componentDidMount() {
     this.getCenterLatLong();
-    let socketEndpoint = "http://localhost:5000";
-    this.socket = io.connect(socketEndpoint, {
-      reconnection: true,
-    });
   }
 
   getCenterLatLong() {
     navigator.geolocation.getCurrentPosition((position) => {
-      this.setState({ centerLat: position.coords.latitude, 
-                      centerLong: position.coords.longitude });
+      this.setState({ 
+        centerLat: position.coords.latitude, 
+        centerLong: position.coords.longitude,
+        inputLat: position.coords.latitude,
+        inputLong: position.coords.longitude
+      });
       this.fetchData();
     });
   }
@@ -248,27 +261,40 @@ class ResourceDashboard extends React.Component {
       })
     })
         .then(response => response.json())
-        .then(data => this.setState({locations: data.results, socketNamespace: data.namespace}))
-        .then(this.connectWebsocket())
+        .then(data => { 
+          this.setState({locations: data.results, namespace: data.namespace});
+          this.connectWebsocket();
+        })
         .catch(error => console.log(error))
   }
 
   connectWebsocket() {
-    let socketUrl = "http://localhost:5000";
-    this.socket = io.connect(socketUrl, {
-      reconnection: true,
+    let socketEndpoint = "localhost:5000/" + this.state.namespace;
+    this.socket = socketIOClient(socketEndpoint);
+    this.socket.on('connect', (message)=> {
+      console.log(this.socket.connected);
     });
-    this.socket.on("message", message => {
-      console.log(message);
-      this.setState({locations: [...this.state.locations, message]});
-    });
+    this.socket.on('message', (message) => {
+      message = message.replace(/'/g, '"');
+      let jsonData = JSON.parse(message);
+      let lat_long = jsonData['coords'].split(',')
+      let lat = lat_long[0]
+      let long = lat_long[1]
+      let newLocations = cloneDeep([...this.state.locations, {lat: lat, long: long, updated: jsonData['updated']}]);
+      this.setState({ locations: newLocations, numLocations: this.state.numLocations++ });
+    })
   }
 
-  addLocation() {
+  addLocation = () => {
     const url = "http://localhost:5000/insert"
     let body = {
-      lat: this.state.inputLat,
-      long: this.state.inputLong,
+      lat: this.state.inputLat + Math.random(),
+      long: this.state.inputLong + Math.random(),
+    }
+    if (this.state.inputExcessResources) {
+      body[this.state.inputResourceType] = this.state.inputResourceQuantity
+    } else {
+      body[this.state.inputResourceType] = -this.state.inputResourceQuantity
     }
     fetch(url, {
       method: 'POST',
@@ -280,8 +306,49 @@ class ResourceDashboard extends React.Component {
       
       body: JSON.stringify(body)
     })
-        .then(response => console.log('added data location'))
-        .then(this.fetchData())
+      .then(response => response.json())
+      .then(data => {
+        console.log('added data location');
+      })
+      .catch(error => console.log(error))
+    return false;
+  }
+
+  handleInputResourceExcessChange(event) {
+    if (event.target.value == "I Have Resources to Give")
+    {
+      this.setState({ inputExcessResources: true });
+    } else {
+      this.setState({ inputExcessResources: false });
+    }
+  }
+
+  handleInputResourceTypeChange(event) {
+    this.setState({ inputResourceType: event.target.id });
+  }
+
+  handleInputResourceQuantityChange(event) {
+    this.setState({ inputResourceQuantity: event.target.value });
+  }
+
+  fetchDataFiltered(field) {
+    const url = "http://localhost:5000/get"
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        lat: 0.1,
+        long: 0.1,
+        radius: 10000000,
+        numeric: field
+      })
+    })
+        .then(response => response.json())
+        .then(data => { this.setState({locations: data.results}); } )
         .catch(error => console.log(error))
   }
 
@@ -291,16 +358,15 @@ class ResourceDashboard extends React.Component {
       this.state[[event.target.name]] = event.target.checked;
 
       if (this.state.checkedMasks) {
-        this.filterMarkers('masks');
+        this.fetchDataFiltered('masks');
       } else if (this.state.checkedVaccines) {
-        this.filterMarkers('vaccines');
+        this.fetchDataFiltered('vaccines');
       } else if (this.state.checkedOxygen) {
-        this.filterMarkers('oxygen');
+        this.fetchDataFiltered('oxygen');
       } else {
         this.fetchData();
       }
     };
-
     return (
       <>
         <div className="content">
@@ -363,7 +429,7 @@ class ResourceDashboard extends React.Component {
                       <Col>
                         <FormGroup>
                           <label>Do you have a surplus or deficit of resources?</label>
-                          <Input type="select">
+                          <Input type="select" onChange={this.handleInputResourceExcessChange}>
                             <option>I Have Resources to Give</option>
                             <option>I Need Resources</option>
                           </Input>
@@ -373,23 +439,23 @@ class ResourceDashboard extends React.Component {
 
                     <Row>
                       <Col className="pc-1" md="12">
-                      <FormGroup tag="fieldset">
-                      <label>What type of resources are you interested in? </label>
+                      <FormGroup tag="fieldset" onChange={this.handleInputResourceTypeChange}>
+                        <label>What type of resources are you interested in? </label>
                         <FormGroup check>
                           <Label check>
-                            <Input type="radio" name="radio1" />{' '}
+                            <Input type="radio" name="radio1" id="masks"/>{' '}
                             Masks
                           </Label>
                         </FormGroup>
                         <FormGroup check>
                           <Label check>
-                            <Input type="radio" name="radio1" />{' '}
+                            <Input type="radio" name="radio1" id="vaccines"/>{' '}
                             Vaccines
                           </Label>
                         </FormGroup>
                         <FormGroup check>
                           <Label check>
-                            <Input type="radio" name="radio1" />{' '}
+                            <Input type="radio" name="radio1" id="oxygen"/>{' '}
                             Oxygen
                           </Label>
                         </FormGroup>
@@ -402,6 +468,7 @@ class ResourceDashboard extends React.Component {
                             defaultValue="0"
                             placeholder="0"
                             type="number"
+                            onChange={this.handleInputResourceQuantityChange}
                           />
                         </FormGroup>
                       </Col>
@@ -413,11 +480,9 @@ class ResourceDashboard extends React.Component {
                           disabled
                         >
                           <label>Latitude</label>
-                          <Input
-                            defaultValue="0"
-                            placeholder="0"
-                            type="text"
-                          />
+                          <div className="update ml-auto mr-auto"> 
+                            {this.state.centerLat} 
+                          </div>
                         </FormGroup>
                       </Col>
                       <Col className="pl-1" md="6">
@@ -425,11 +490,9 @@ class ResourceDashboard extends React.Component {
                           disabled
                         >
                           <label>Longitude</label>
-                          <Input
-                            defaultValue="0"
-                            placeholder="0"
-                            type="text"
-                          />
+                          <div className="update ml-auto mr-auto"> 
+                            {this.state.centerLong} 
+                          </div>
                         </FormGroup>
                       </Col>
                     </Row>
@@ -438,8 +501,8 @@ class ResourceDashboard extends React.Component {
                         <Button
                           className="btn-round"
                           color="primary"
-                          type="submit"
-                          onClick={() => this.addLocation()}
+                          type="button"
+                          onClick={this.addLocation}
                         >
                           Add Resource Request to Map
                         </Button>
