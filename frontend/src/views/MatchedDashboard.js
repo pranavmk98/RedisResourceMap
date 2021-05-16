@@ -26,7 +26,6 @@ import {
   CardHeader,
   CardBody,
   CardTitle,
-  Table,
   Row,
   Col,
 } from "reactstrap";
@@ -37,7 +36,7 @@ function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min) + min); //The maximum is exclusive and the minimum is inclusive
 }
 
-class Tables extends React.Component {
+class MatchedDashboard extends React.Component {
   componentDidMount() {
     setInterval(() => this.forceUpdate(), 1000);
   }
@@ -73,4 +72,4 @@ class Tables extends React.Component {
   }
 }
 
-export default Tables;
+export default MatchedDashboard;

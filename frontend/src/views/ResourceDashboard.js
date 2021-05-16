@@ -271,11 +271,8 @@ class ResourceDashboard extends React.Component {
   connectWebsocket() {
     let socketEndpoint = "localhost:5000/" + this.state.namespace;
     this.socket = socketIOClient(socketEndpoint);
-    this.socket.on('connect', (message)=> {
-      console.log(this.socket.connected);
-    });
+    this.socket.on('connect', (message)=> {});
     this.socket.on('message', (message) => {
-      console.log('message');
       message = message.replace(/'/g, '"');
       let jsonData = JSON.parse(message);
       let lat_long = jsonData['coords'].split(',')
@@ -309,9 +306,7 @@ class ResourceDashboard extends React.Component {
       body: JSON.stringify(body)
     })
       .then(response => response.json())
-      .then(data => {
-        console.log('added data location');
-      })
+      .then(data => {})
       .catch(error => console.log(error))
     return false;
   }

@@ -196,10 +196,8 @@ Format of match data (e.g. for masks): {
 def process_channel_msg(msg):
     if msg['type'] == 'message':
         with app.test_request_context():
-            # print(msg['data'])
             data = msg['data'].decode('utf-8')
             json_data = json.dumps(data)
-            # print(json_data)
             socket_app.emit('message', data, namespace=SOCKET_NAMESPACE)
 
 if __name__ == "__main__":
