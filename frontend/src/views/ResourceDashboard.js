@@ -275,6 +275,7 @@ class ResourceDashboard extends React.Component {
       console.log(this.socket.connected);
     });
     this.socket.on('message', (message) => {
+      console.log('message');
       message = message.replace(/'/g, '"');
       let jsonData = JSON.parse(message);
       let lat_long = jsonData['coords'].split(',')
@@ -282,6 +283,7 @@ class ResourceDashboard extends React.Component {
       let long = lat_long[1]
       let newLocations = cloneDeep([...this.state.locations, {lat: lat, long: long, updated: jsonData['updated']}]);
       this.setState({ locations: newLocations, numLocations: this.state.numLocations++ });
+      this.fetchData();
     })
   }
 
@@ -390,6 +392,7 @@ class ResourceDashboard extends React.Component {
                       centerLat={this.state.centerLat}
                       centerLong={this.state.centerLong}
                       locations={this.state.locations}
+                      key={this.state.numLocations}
                     />
                   </div>
                   <CardFooter>
