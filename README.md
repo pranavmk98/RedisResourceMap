@@ -24,5 +24,3 @@ COVID-19 Resource Dashboard is a project leveraging the power of RediSearch, Red
 - Using pip and python 3.7, install the requirements in `requirements.txt`
 - Run `python server.py` from `backend/`
 - Run `npm install` and `npm start` from `frontend/`
-
-Laze
