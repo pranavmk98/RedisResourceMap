@@ -16,7 +16,7 @@
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 */
-import React, { useState } from "react";
+import React from "react";
 import {
   withScriptjs,
   withGoogleMap,
@@ -224,6 +224,7 @@ class ResourceDashboard extends React.Component {
       inputResourceQuantity: 0,
     }
 
+    this.handleFilterChange = this.handleFilterChange.bind(this);
     this.handleInputResourceExcessChange = this.handleInputResourceExcessChange.bind(this);
     this.handleInputResourceTypeChange = this.handleInputResourceTypeChange.bind(this);
     this.handleInputResourceQuantityChange = this.handleInputResourceQuantityChange.bind(this);
@@ -349,21 +350,21 @@ class ResourceDashboard extends React.Component {
         .catch(error => console.log(error))
   }
 
-  render() {
-    const handleFilterChange = (event) => {
-      // For some reason the setState function isn't working, but this does
-      this.state[[event.target.name]] = event.target.checked;
+  handleFilterChange = (event) => {
+    // For some reason the setState function isn't working, but this does
+    this.state[[event.target.name]] = event.target.checked;
+    if (this.state.checkedMasks) {
+      this.fetchDataFiltered('masks');
+    } else if (this.state.checkedVaccines) {
+      this.fetchDataFiltered('vaccines');
+    } else if (this.state.checkedOxygen) {
+      this.fetchDataFiltered('oxygen');
+    } else {
+      this.fetchData();
+    }
+  };
 
-      if (this.state.checkedMasks) {
-        this.fetchDataFiltered('masks');
-      } else if (this.state.checkedVaccines) {
-        this.fetchDataFiltered('vaccines');
-      } else if (this.state.checkedOxygen) {
-        this.fetchDataFiltered('oxygen');
-      } else {
-        this.fetchData();
-      }
-    };
+  render() {
     return (
       <>
         <div className="content">
@@ -396,17 +397,17 @@ class ResourceDashboard extends React.Component {
                   </div>
                   <FormGroup>
                     <FormControlLabel
-                        control={<Checkbox checked={this.state.checkedMasks} onChange={handleFilterChange} name="checkedMasks" />}
+                        control={<Checkbox checked={this.state.checkedMasks} onChange={this.handleFilterChange} name="checkedMasks" />}
                         label="Masks"
                         color="red"
                     />
                     <FormControlLabel
-                        control={<Checkbox checked={this.state.checkedVaccines} onChange={handleFilterChange} name="checkedVaccines" />}
+                        control={<Checkbox checked={this.state.checkedVaccines} onChange={this.handleFilterChange} name="checkedVaccines" />}
                         label="Vaccines"
                         color="blue"
                     />
                     <FormControlLabel
-                        control={<Checkbox checked={this.state.checkedOxygen} onChange={handleFilterChange} name="checkedOxygen" />}
+                        control={<Checkbox checked={this.state.checkedOxygen} onChange={this.handleFilterChange} name="checkedOxygen" />}
                         label="Oxygen"
                         color="green"
                     />

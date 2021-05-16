@@ -35,6 +35,7 @@ GEO_FIELDS = [
 
 # Socket namespace to publish updates on
 SOCKET_NAMESPACE = ''
+GEARS_JOB_RUNNING = False
 
 # Not really int max, but hopefully numbers don't exceed this for our purposes
 # (I think this is 10 billion)
@@ -138,6 +139,7 @@ Return JSON data format:
 '''
 @app.route('/get', methods=['POST'])
 def get_data():
+    global GEARS_JOB_RUNNING
     json = request.json
     if 'lat' in json and 'long' in json:
         lat, long, radius = json['lat'], json['long'], json['radius']
@@ -167,7 +169,9 @@ def get_data():
 
         # SOCKET_NAMESPACE = get_socket_namespace(lat, long, radius)
 
-        create_gears_jobs(lat, long, radius)
+        if not GEARS_JOB_RUNNING:
+            create_gears_jobs(lat, long, radius)
+            GEARS_JOB_RUNNING = True
         return {'results' : response, 'namespace' : SOCKET_NAMESPACE}, 200
 
     return "Bad request", 400
