@@ -17,6 +17,7 @@
 
 */
 import ResourceDashboard from "views/ResourceDashboard.js";
+import Tables from "views/Tables.js";
 
 var routes = [
   {
@@ -24,6 +25,13 @@ var routes = [
     name: "Resource Dashboard",
     icon: "nc-icon nc-bank",
     component: ResourceDashboard,
+    layout: "/admin",
+  },
+  {
+    path: "/matches",
+    name: "Matched Resources",
+    icon: "nc-icon nc-bank",
+    component: Tables,
     layout: "/admin",
   },
 ];

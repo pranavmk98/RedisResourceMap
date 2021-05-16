@@ -1,13 +1,26 @@
 # RedisResourceMap
 
-Submission for Build on Redis Hackathon 2021 by Pranav Kumar and Josh Durham.
+COVID-19 Resource Dashboard is a project leveraging the power of RediSearch, RedisGears, and Redis PubSub to create a live-updating, crowdsourced dashboard to connect places with excess supply of masks, oxygen, and vaccines to places lacking in such supplies. Users can add locations to indicate both excess supply and required resources, and the RedisGears matching engine will utilize the power of RediSearch geospatial querying to match up supplies with requirements.
 
-COVID-19 has ravaged healthcare systems globally, a problem that is only compounded in countries without an existing robust network. Recently we have seen India fall prey to supply chain failures, oxygen shortage, and a significant increase in cases/death, the latest in a series of countries struggling to deal with the pandemic.
+## How data is stored
 
-We created [INSERT NAME HERE], a crowdsourced resource discovery and routing app designed to help out and fill in the gaps where the government or larger bodies may not have devoted enough resources. Our app, backed by Redis modules such as RediSearch and [INSERT ANOTHER MODULE HERE IF WE USE IT?], is designed to provide a consolidated center of information to help connect areas with excess resources or supplies with those that are deficient.
+- Resource and location data are stored as documents in the RediSearch format. They contain the fields:
+  - masks (Numerical)
+  - vaccines (Numerical)
+  - oxygen (Numerical)
+  - updated (Numerical)
+  - coords (Geo)
+- Data is queried with the RediSearch API, specifically using `FT.SEARCH` with heavy use of `GEORADIUS`. This is used to query within a certain radius near a location.
+- New data is processed with RedisGears async jobs, and sent via Redis PubSub on either the `new_data` channel or `match_data` channel (if a resource is matched)
 
-We utilize the power of RediSearch's geospatial filtering to quickly query locations and [SOME OTHER REDIS FEATURE?]. This allows our app to operate at scale and under high demand, with constant updates and queries.
+## Screenshots
+
+![Main Page](img/MainPage.jpg)
+![Match graph](img/Graph.jpg)
 
 ## Instructions
 
-Laze
+- Run the Redis labs docker image: `docker run -p 6379:6379`
+- Using pip and python 3.7, install the requirements in `requirements.txt`
+- Run `python server.py` from `backend/`
+- Run `npm install` and `npm start` from `frontend/`
