@@ -15,6 +15,10 @@ COVID-19 Resource Dashboard is a project leveraging the power of RediSearch, Red
 
 ## Screenshots
 
+### Architecture Diagram
+
+![Architecture](https://raw.githubusercontent.com/pranavmk98/RedisResourceMap/master/img/architecture.png)
+
 ![Main Page](https://raw.githubusercontent.com/pranavmk98/RedisResourceMap/master/img/MainPage.jpg)
 ![Match graph](https://raw.githubusercontent.com/pranavmk98/RedisResourceMap/master/img/Graph.jpg)
 
