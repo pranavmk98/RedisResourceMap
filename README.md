@@ -10,8 +10,16 @@ COVID-19 Resource Dashboard is a project leveraging the power of RediSearch, Red
   - oxygen (Numerical)
   - updated (Numerical)
   - coords (Geo)
-- Data is queried with the RediSearch API, specifically using `FT.SEARCH` with heavy use of `GEORADIUS`. This is used to query within a certain radius near a location.
-- New data is processed with RedisGears async jobs, and sent via Redis PubSub on either the `new_data` channel or `match_data` channel (if a resource is matched)
+
+## How data is processed
+
+- Data is inserted (as RediSearch documents) using the `HSET` command. Details on query construction are abstracted away with the `RediSearch` Python API, but the fields are as mentioned above
+- Data is queried using `FT.SEARCH`:
+    - Since this uses geospatial querying, heavy use of `GEORADIUS`/geospatial query syntax is used
+    - Example query: `FT.SEARCH @coords[long lat radius km] FILTER masks 1 10000 INKEYS 1 -76,40`
+- Update are published with PUBLISH and read with SUBSCRIBE
+    - New data is processed with RedisGears async jobs, and sent via Redis PubSub on either the `new_data` channel or `match_data` channel (if a resource is matched)
+    - Example: `PUBLISH new_data "{masks: 10, ...}"`, `SUBSCRIBE new_data`
 
 ## Screenshots
 
