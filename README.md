@@ -20,7 +20,7 @@ COVID-19 Resource Dashboard is a project leveraging the power of RediSearch, Red
 
 ## Instructions
 
-- Run the Redis labs RedisModules docker image: `docker run -p 6379:6379 redislabs/redismod``
+- Run the Redis labs RedisModules docker image: `docker run -p 6379:6379 redislabs/redismod`
 - Using pip and python 3.7, install the requirements in `requirements.txt`, or create a Conda environment using `conda env create --file conda_env.yml` and then run `conda activate redis` to activate the environment.
 - Run `python server.py` from `backend/`.  This will create a server accessible at `localhost:5000`
 - Install node.js and npm if you do not already have it installed (see [https://nodejs.org/en/download/](https://nodejs.org/en/download/)).  Then run `npm install` and `npm start` from `frontend/`, and the React frontend should appear in your web browser at `localhost:3000/admin/dashboard`
